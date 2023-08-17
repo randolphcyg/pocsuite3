@@ -6,7 +6,7 @@ from typing import List
 
 import dacite
 from collections import OrderedDict
-
+from dataclasses import dataclass, asdict
 from pocsuite3.lib.core.common import urlparse
 from pocsuite3.lib.core.datatype import AttribDict
 from pocsuite3.lib.json.goby.model import Severify
@@ -72,16 +72,17 @@ def process_none_lists(data_class, data_dict):
 
 
 class Goby:
-    def __init__(self, src, target=''):
+    def __init__(self, template, target=''):
         # [goby tpl]
-        self.goby_template = src
+        self.goby_template = template
         try:
             self.goby_template = binascii.unhexlify(self.goby_template).decode()
         except ValueError:
             pass
+        self.goby_template = expand_preprocessors(self.goby_template)
 
         # [tpl]
-        tmp_tpl = json.loads(src)
+        tmp_tpl = json.loads(template)
         process_none_lists(Template, tmp_tpl)
         data = hyphen_to_underscore(tmp_tpl)
         self.template = dacite.from_dict(data_class=Template, data=data)
@@ -94,16 +95,6 @@ class Goby:
 
         # [json tpl]
         self.json_template = AttribDict()
-        self.json_template['info'] = AttribDict()
-
-        self.json_template['info']['CVEIDs'] = self.template.CVEIDs
-        self.json_template['info']['name'] = self.template.Name
-        self.json_template['info']['description'] = self.template.Description
-        self.json_template['info']['product'] = self.template.Product
-        self.json_template['info']['Homepage'] = self.template.Homepage
-        self.json_template['info']['author'] = self.template.Author
-        self.json_template['info']['level'] = self.template.Level
-
         requests = []
         if len(self.template.ScanStepsList) >= 1:
             for item in self.template.ScanStepsList:
@@ -136,23 +127,8 @@ class Goby:
         for k, v in self.dynamic_values.copy().items():
             self.dynamic_values[k.lower()] = v
 
-        # Variables can be used to declare some values which remain constant throughout the template.
-        # The value of the variable once calculated does not change.
-        # Variables can be either simple strings or DSL helper functions. If the variable is a helper function,
-        # it is enclosed in double-curly brackets {{<expression>}}. Variables are declared at template level.
-
-        # Example variables:
-
-        # variables:
-        #     a1: "test" # A string variable
-        #     a2: "{{to_lower(rand_base(5))}}" # A DSL function variable
-
-        for k, v in self.template.variables.items():
+        for k, v in asdict(self.template).items():
             self.dynamic_values[k] = evaluate(v)
-
-        # Since release of Nuclei v2.3.6, Nuclei supports using the interact.sh API to achieve OOB based
-        # vulnerability scanning with automatic Request correlation built in. It's as easy as writing
-        # {{interactsh-url}} anywhere in the request.
 
         if (f'{Marker.ParenthesisOpen}interactsh-url{Marker.ParenthesisClose}' in self.goby_template or
                 f'{Marker.General}interactsh-url{Marker.General}' in self.goby_template):
@@ -160,8 +136,8 @@ class Goby:
             self.interactsh = InteractshClient()
             self.dynamic_values['interactsh-url'] = self.interactsh.client.domain
 
-        for request in self.template.requests:
-            res = execute_http_request(request, self.dynamic_values, self.interactsh)
+        for item in self.template.ScanStepsList:
+            res = execute_http_request(item.Request, self.dynamic_values, self.interactsh)
             if res:
                 return res
         # for request in self.template.network:
@@ -183,7 +159,7 @@ class Goby:
             'description': 'desc',
             'reference': 'references'
         }
-        for k, v in self.json_template['info'].items():
+        for k, v in asdict(self.template).items():
             if k in key_convert:
                 k = key_convert.get(k)
             if type(v) in [str]:
@@ -208,7 +184,7 @@ class Goby:
             '            result["VerifyInfo"] = {}\n',
             '            result["VerifyInfo"]["URL"] = self.url\n',
             '            result["VerifyInfo"]["Info"] = {}\n',
-            '            result["VerifyInfo"]["Info"]["Severity"] = "%s"\n' % self.json_template['info']['level'],
+            '            result["VerifyInfo"]["Info"]["Severity"] = "%s"\n' % self.template.Level,
             '            if not isinstance(res, bool):\n'
             '               result["VerifyInfo"]["Info"]["Result"] = res\n',
             '        return self.parse_output(result)\n',

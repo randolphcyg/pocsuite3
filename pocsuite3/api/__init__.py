@@ -34,6 +34,7 @@ from pocsuite3.lib.request import requests
 from pocsuite3.lib.utils import (generate_shellcode_list, get_middle_text,
                                  minimum_version_required, random_str)
 from pocsuite3.lib.yaml.nuclei import Nuclei
+from pocsuite3.lib.json.goby import Goby
 from pocsuite3.modules.censys import Censys
 from pocsuite3.modules.ceye import CEye
 from pocsuite3.modules.fofa import Fofa

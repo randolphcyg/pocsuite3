@@ -338,7 +338,7 @@ def _set_pocs_modules():
 
                 elif any([poc in exists_poc_with_ext, poc in exists_pocs]):
                     poc_name, poc_ext = os.path.splitext(poc)
-                    if poc_ext in ['.py', '.pyc', '.yaml']:
+                    if poc_ext in ['.py', '.pyc', '.yaml', '.json']:
                         file_path = os.path.join(paths.POCSUITE_POCS_PATH, poc)
                     else:
                         file_path = os.path.join(paths.POCSUITE_POCS_PATH, poc + exists_pocs.get(poc))
@@ -347,12 +347,12 @@ def _set_pocs_modules():
                 elif check_path(poc):
                     for root, _, files in os.walk(poc):
                         files = filter(lambda x: not x.startswith("__") and x.endswith(".py") or
-                                       x.endswith('.yaml'), files)
+                                       x.endswith('.yaml') or x.endswith('.json'), files)
                         _pocs.extend(map(lambda x: os.path.join(root, x), files))
 
                 for p in _pocs:
                     file_content = get_file_text(p)
-                    if not re.search(r'register_poc|matchers:\s+-', file_content):
+                    if not re.search(r'register_poc|matchers:\s+-|ScanSteps', file_content):
                         continue
                     if conf.poc_keyword:
                         if not re.search(conf.poc_keyword, file_content, re.I | re.M):

@@ -41,6 +41,8 @@ class PocLoader(Loader):
     def check_requires(data):
         requires = get_poc_requires(data)
         requires = [i.strip().strip('"').strip("'") for i in requires.split(',')] if requires else ['']
+        if requires is None:
+            return
         if requires[0]:
             poc_name = get_poc_name(data)
             info_msg = 'PoC script "{0}" requires "{1}" to be installed'.format(poc_name, ', '.join(requires))
@@ -68,6 +70,11 @@ class PocLoader(Loader):
     def exec_module(self, module):
         filename = self.get_filename(self.fullname)
         poc_code = self.get_data(filename)
+
+        # convert goby json template to pocsuite3 poc script
+        if filename.endswith('.json') and re.search(r'ScanSteps', poc_code):
+            from pocsuite3.lib.json.goby import Goby
+            poc_code = str(Goby(poc_code))
 
         # convert yaml template to pocsuite3 poc script
         if filename.endswith('.yaml') and re.search(r'matchers:\s+-', poc_code):

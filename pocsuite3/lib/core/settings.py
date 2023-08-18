@@ -173,6 +173,7 @@ CMD_PARSE_WHITELIST = [
     "rule-filename",
     "no-check",
     "options",
+    "convert-goby",
 
     # other
     "poc",

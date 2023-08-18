@@ -587,6 +587,7 @@ def _set_conf_attributes():
     conf.rule_filename = None
     conf.no_check = False
     conf.show_options = False
+    conf.convert_goby_to_py = False
     conf.enable_tls_listener = False
 
 

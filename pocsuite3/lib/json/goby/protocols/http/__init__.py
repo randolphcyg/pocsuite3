@@ -1,27 +1,22 @@
 import re
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Union, List, Optional
+from typing import Union
+from urllib.parse import urljoin
 
 from requests_toolbelt.utils import dump
 
-from urllib.parse import urljoin
 from pocsuite3.lib.core.data import AttribDict
 from pocsuite3.lib.core.log import LOGGER as logger
-from pocsuite3.lib.request import requests
 from pocsuite3.lib.json.goby.model import CaseInsensitiveEnum
-from pocsuite3.lib.json.goby.operators import (Extractor, ExtractorType,
-                                               ResponseTest, ResponseTestType,
+from pocsuite3.lib.json.goby.operators import (ExtractorType,
                                                extract_dsl, extract_json,
                                                extract_kval, extract_regex,
-                                               extract_xpath, match_binary,
-                                               match_dsl, match_regex,
-                                               match_size, match_status_code,
-                                               match_words)
-from pocsuite3.lib.json.goby.protocols.common.generators import AttackType, payload_generator
+                                               extract_xpath)
 from pocsuite3.lib.json.goby.protocols.common.interactsh import InteractshClient
 from pocsuite3.lib.json.goby.protocols.common.replacer import (
-    UnresolvedVariableException, UNRESOLVED_VARIABLE, marker_replace, Marker)
+    UNRESOLVED_VARIABLE)
+from pocsuite3.lib.request import requests
 
 
 class HTTPMethod(CaseInsensitiveEnum):

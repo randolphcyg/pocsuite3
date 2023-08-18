@@ -1,14 +1,46 @@
+import os
 import re
+from urllib.parse import urljoin
+
 import pkg_resources
 import importlib.machinery
 import importlib.util
 from importlib.abc import Loader
+from pocsuite3.lib.core.data import conf, cmd_line_options
+
+
 from pocsuite3.lib.core.common import (
     multiple_replace, get_filename, get_md5, get_file_text,
     is_pocsuite3_poc, get_poc_requires, get_poc_name)
 from pocsuite3.lib.core.data import kb
 from pocsuite3.lib.core.data import logger
 from pocsuite3.lib.core.settings import POC_IMPORTDICT
+
+
+# 生成python模版文件
+def gen_py_tpl(filename: str, content: str):
+    # 获取项目的根目录
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+    # 新文件夹的名称
+    folder_name = 'py_templates'
+    folder_path = os.path.join(project_root, folder_name)
+
+    # 完整的目标文件路径
+    base_name = os.path.basename(filename)
+    name_without_extension = os.path.splitext(base_name)[0]
+    py_filename = name_without_extension + '.py'
+    py_filepath = os.path.join(folder_path, py_filename)
+
+    # 判断文件夹是否存在，不存在则创建
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+
+    # 写入文件内容
+    with open(py_filepath, "w") as file:
+        file.write(content)
+
+    return py_filepath
 
 
 class PocLoader(Loader):
@@ -75,6 +107,10 @@ class PocLoader(Loader):
         if filename.endswith('.json') and re.search(r'ScanSteps', poc_code):
             from pocsuite3.lib.json.goby import Goby
             poc_code = str(Goby(poc_code))
+            if conf.convert_goby_to_py:
+                # goby json模板生成python模板文件存储
+                py_filepath = gen_py_tpl(filename, poc_code)
+                logger.info("gen python template: {}".format(py_filepath))
 
         # convert yaml template to pocsuite3 poc script
         if filename.endswith('.yaml') and re.search(r'matchers:\s+-', poc_code):

@@ -156,6 +156,8 @@ def cmd_line_parser(argv=None):
         diy = parser.add_argument_group("Poc options", "definition options for PoC")
         diy.add_argument("--options", dest="show_options", action="store_true", default=False,
                          help="Show all definition options")
+        diy.add_argument("--convert-goby", dest="convert_goby_to_py", action="store_true", default=False,
+                         help="generate python template from goby template")
 
         for line in argv:
             if line.startswith("--"):

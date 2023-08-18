@@ -2,11 +2,12 @@ import binascii
 import json
 import re
 import socket
+from collections import OrderedDict
+from dataclasses import asdict
 from typing import List
 
 import dacite
-from collections import OrderedDict
-from dataclasses import dataclass, asdict
+
 from pocsuite3.lib.core.common import urlparse
 from pocsuite3.lib.core.datatype import AttribDict
 from pocsuite3.lib.json.goby.model import Severify

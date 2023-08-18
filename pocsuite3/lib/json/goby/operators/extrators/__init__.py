@@ -178,7 +178,8 @@ def extract_json(e: Extractor, corpus: str) -> dict:
     try:
         import jq
     except ImportError:
-        logger.error('Python bindings for jq not installed, it only supports linux and macos, https://pypi.org/project/jq/')
+        logger.error(
+            'Python bindings for jq not installed, it only supports linux and macos, https://pypi.org/project/jq/')
         return results
 
     for j in e.json:

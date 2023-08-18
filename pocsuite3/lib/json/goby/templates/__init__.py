@@ -1,10 +1,9 @@
 from dataclasses import dataclass, field
 from typing import List
 
-from pocsuite3.lib.json.goby.model import Info, CaseInsensitiveEnum
-from pocsuite3.lib.json.goby.protocols.http import HttpRequest
-from pocsuite3.lib.json.goby.protocols.network import NetworkRequest
+from pocsuite3.lib.json.goby.model import CaseInsensitiveEnum
 from pocsuite3.lib.json.goby.operators import ResponseTest, Extractor
+from pocsuite3.lib.json.goby.protocols.http import HttpRequest
 
 
 class ProtocolType(CaseInsensitiveEnum):
@@ -36,6 +35,7 @@ class ExpParam:
 class ScanStep:
     Request: HttpRequest
     ResponseTest: ResponseTest
+
 
 @dataclass
 class Template:
@@ -100,4 +100,3 @@ class Template:
     stop_at_first_match: bool = True
     variables: dict = field(default_factory=dict)
     extractors: List[Extractor] = field(default_factory=list)
-

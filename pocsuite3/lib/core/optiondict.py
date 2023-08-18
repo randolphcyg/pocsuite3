@@ -75,6 +75,7 @@ optDict = {
         'no_check': 'boolean'
     },
     'Poc options': {
-        'show_options': 'boolean'
+        'show_options': 'boolean',
+        'convert_goby_to_py': 'boolean'
     }
 }

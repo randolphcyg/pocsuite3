@@ -5,17 +5,14 @@ import ssl
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Union, List
+from typing import Union
 
 from pocsuite3.lib.core.common import urlparse
 from pocsuite3.lib.core.log import LOGGER as logger
 from pocsuite3.lib.json.goby.model import CaseInsensitiveEnum
-from pocsuite3.lib.json.goby.operators import (Extractor, ExtractorType,
-                                                 extract_dsl, extract_kval, extract_regex,
-                                                 match_binary,
-                                                 match_dsl, match_regex,
-                                                 match_size, match_words)
-from pocsuite3.lib.json.goby.protocols.common.generators import AttackType, payload_generator
+from pocsuite3.lib.json.goby.operators import (ExtractorType,
+                                               extract_dsl, extract_kval, extract_regex)
+from pocsuite3.lib.json.goby.protocols.common.generators import payload_generator
 from pocsuite3.lib.json.goby.protocols.common.interactsh import InteractshClient
 from pocsuite3.lib.json.goby.protocols.common.replacer import (
     UNRESOLVED_VARIABLE, marker_replace)

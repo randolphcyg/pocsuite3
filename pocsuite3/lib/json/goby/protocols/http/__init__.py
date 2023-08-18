@@ -1,21 +1,23 @@
+import re
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Union, List, Optional
 
 from requests_toolbelt.utils import dump
 
+from urllib.parse import urljoin
 from pocsuite3.lib.core.data import AttribDict
 from pocsuite3.lib.core.log import LOGGER as logger
 from pocsuite3.lib.request import requests
 from pocsuite3.lib.json.goby.model import CaseInsensitiveEnum
 from pocsuite3.lib.json.goby.operators import (Extractor, ExtractorType,
-                                                 ResponseTest, ResponseTestType,
-                                                 extract_dsl, extract_json,
-                                                 extract_kval, extract_regex,
-                                                 extract_xpath, match_binary,
-                                                 match_dsl, match_regex,
-                                                 match_size, match_status_code,
-                                                 match_words)
+                                               ResponseTest, ResponseTestType,
+                                               extract_dsl, extract_json,
+                                               extract_kval, extract_regex,
+                                               extract_xpath, match_binary,
+                                               match_dsl, match_regex,
+                                               match_size, match_status_code,
+                                               match_words)
 from pocsuite3.lib.json.goby.protocols.common.generators import AttackType, payload_generator
 from pocsuite3.lib.json.goby.protocols.common.interactsh import InteractshClient
 from pocsuite3.lib.json.goby.protocols.common.replacer import (
@@ -116,7 +118,7 @@ def http_response_to_dsl_map(resp: requests.Response):
     data['request'] = req_headers_raw.encode() + b'\n\n' + req_body
     data['response'] = resp_headers_raw.encode() + b'\n\n' + resp_body
     data['status_code'] = resp.status_code
-    data['body'] = resp_body
+    data['body'] = str(resp_body)
     data['all_headers'] = resp_headers_raw
     data['header'] = resp_headers_raw
     data['kval_extractor_dict'] = {}
@@ -156,56 +158,62 @@ def http_get_match_part(part: str, resp_data: dict, interactsh=None, return_byte
     return result
 
 
-def http_match(request: HttpRequest, resp_data: dict, interactsh=None):
-    matchers = request.matchers
+def perform_logical_operation(data, matcher):
+    # 获取条件字段的值
+    target_value = matcher.value
+    operation = matcher.operation
+
+    # 根据操作进行逻辑匹配
+    if operation == "==":
+        return data == target_value
+    elif operation == "!=":
+        return data != target_value
+    elif operation == ">":
+        return data > target_value
+    elif operation == "<":
+        return data < target_value
+    elif operation == ">=":
+        return data >= target_value
+    elif operation == "<=":
+        return data <= target_value
+    elif operation == "contains":
+        return target_value in data
+    elif operation == "not contains":
+        return target_value not in data
+    elif operation == "start_with":
+        return data.startswith(target_value)
+    elif operation == "end_with":
+        return data.endswith(target_value)
+    elif operation == "regex":
+        return re.search(target_value, data) is not None
+    else:
+        raise ValueError(f"Unsupported operation: {operation}")
+
+
+def http_match(step, resp_data: dict, interactsh=None):
+    matchers = step.ResponseTest.checks
     matchers_result = []
 
     for i, matcher in enumerate(matchers):
-        matcher_res = False
-        # item = http_get_match_part(matcher.part, resp_data, interactsh, matcher.type == MatcherType.BinaryMatcher)
-
-        # if matcher.type == MatcherType.StatusMatcher:
-        #     matcher_res = match_status_code(matcher, resp_data.get('status_code', 0))
-        #
-        # elif matcher.type == MatcherType.SizeMatcher:
-        #     matcher_res = match_size(matcher, len(item))
-        #
-        # elif matcher.type == MatcherType.WordsMatcher:
-        #     matcher_res, _ = match_words(matcher, item, resp_data)
-        #
-        # elif matcher.type == MatcherType.RegexMatcher:
-        #     matcher_res, _ = match_regex(matcher, item)
-        #
-        # elif matcher.type == MatcherType.BinaryMatcher:
-        #     matcher_res, _ = match_binary(matcher, item)
-        #
-        # elif matcher.type == MatcherType.DSLMatcher:
-        #     matcher_res = match_dsl(matcher, resp_data)
-        #
-        # if matcher.negative:
-        #     matcher_res = not matcher_res
+        match matcher.variable:
+            case "$code":
+                matcher_res = perform_logical_operation(str(resp_data['status_code']), matcher)
+                matchers_result.append(matcher_res)
+            case "$body":
+                matcher_res = perform_logical_operation(resp_data['body'], matcher)
+                matchers_result.append(matcher_res)
 
         logger.debug(f'[+] {matcher} -> {matcher_res}')
 
-        if not matcher_res:
-            if request.matchers_condition == 'and':
-                return False
-            elif request.matchers_condition == 'or':
-                continue
-
-        if request.matchers_condition == 'or':
-            return True
-
-        matchers_result.append(matcher_res)
-
-        if len(matchers) - 1 == i:
-            return True
-
-    return False
+    if len(matchers_result) > 0:
+        if step.ResponseTest.operation == 'AND':
+            return all(matchers_result)
+        elif step.ResponseTest.operation == 'OR':
+            return any(matchers_result)
 
 
-def http_extract(request: HttpRequest, resp_data: dict):
-    extractors = request.extractors
+def http_extract(template, resp_data: dict):
+    extractors = template.extractors
     extractors_result = {'internal': {}, 'external': {}, 'extra_info': []}
 
     for extractor in extractors:
@@ -238,78 +246,28 @@ def extract_dict(text, line_sep='\n', kv_sep='='):
 
 
 def http_request_generator(request: HttpRequest, dynamic_values: OrderedDict):
-    request_count = len(request.path + request.raw)
-    for payload_instance in payload_generator(request.payloads, request.attack):
-        current_index = 0
-        dynamic_values.update(payload_instance)
-        for path in request.path + request.raw:
-            current_index += 1
-            method, url, headers, data, kwargs = '', '', '', '', OrderedDict()
-            # base request
-            username, password = request.digest_username, request.digest_password
-            if path.startswith(Marker.ParenthesisOpen):
-                method = request.method.value
-                headers = request.headers
-                data = request.body
-                url = path
+    method, url, headers, data, kwargs = '', '', '', '', OrderedDict()
+    method = request.method
+    url = request.uri
+    headers = request.header
+    data = request.data
 
-            # raw
-            else:
-                raw = path.strip()
-                raws = list(map(lambda x: x.strip(), raw.splitlines()))
-                method, path, _ = raws[0].split(' ')
-                url = f'{Marker.ParenthesisOpen}BaseURL{Marker.ParenthesisClose}{path}'
-
-                if method == "POST":
-                    index = 0
-                    for i in raws:
-                        index += 1
-                        if i.strip() == "":
-                            break
-                    if len(raws) == index:
-                        raise Exception
-
-                    headers = raws[1:index - 1]
-                    headers = extract_dict('\n'.join(headers), '\n', ": ")
-                    data = raws[index]
-                else:
-                    headers = extract_dict('\n'.join(raws[1:]), '\n', ": ")
-
-            kwargs.setdefault('allow_redirects', request.redirects)
-            kwargs.setdefault('data', data)
-            kwargs.setdefault('headers', headers)
-            if username or password:
-                kwargs.setdefault('auth', (username, password))
-            try:
-                url = marker_replace(url, dynamic_values)
-                kwargs = marker_replace(kwargs, dynamic_values)
-            except UnresolvedVariableException:
-                continue
-
-            if 'auth' in kwargs:
-                kwargs['auth'] = tuple(kwargs['auth'])
-            yield method, url, kwargs, payload_instance, request_count, current_index
+    yield method, url, kwargs, data,
 
 
-def execute_http_request(request: HttpRequest, dynamic_values, interactsh) -> Union[bool, list]:
+def execute_http_request(step, template, dynamic_values, interactsh) -> Union[bool, list]:
+    req = step.Request
     results = []
     resp_data_all = {}
     with requests.Session() as session:
         try:
-            for (method, url, kwargs, payload, request_count, current_index) in http_request_generator(
-                    request, dynamic_values):
+            for (method, url, kwargs, payload) in http_request_generator(req, dynamic_values):
                 try:
-                    # Redirection conditions can be specified per each template. By default, redirects are not
-                    # followed. However, if desired, they can be enabled with redirects: true in request details. 10
-                    # redirects are followed at maximum by default which should be good enough for most use cases.
-                    # More fine grained control can be exercised over number of redirects followed by using
-                    # max-redirects field.
-
-                    if request.max_redirects:
-                        session.max_redirects = request.max_redirects
+                    if req.max_redirects:
+                        session.max_redirects = req.max_redirects
                     else:
                         session.max_redirects = 10
-                    response = session.request(method=method, url=url, **kwargs)
+                    response = session.request(method=method, url=urljoin(dynamic_values['BaseURL'], url), **kwargs)
                     # for debug purpose
                     try:
                         logger.debug(dump.dump_all(response).decode('utf-8'))
@@ -324,40 +282,40 @@ def execute_http_request(request: HttpRequest, dynamic_values, interactsh) -> Un
                 resp_data = http_response_to_dsl_map(response)
                 if response:
                     response.close()
-
-                extractor_res = http_extract(request, resp_data)
+                # TODO 提取根据更多情况优化
+                extractor_res = http_extract(template, resp_data)
                 for k, v in extractor_res['internal'].items():
                     if v == UNRESOLVED_VARIABLE and k in dynamic_values:
                         continue
                     else:
                         dynamic_values[k] = v
 
-                if request.req_condition:
+                if req.req_condition:
                     resp_data_all.update(resp_data)
                     for k, v in resp_data.items():
-                        resp_data_all[f'{k}_{current_index}'] = v
-                    if current_index == request_count:
-                        resp_data_all.update(dynamic_values)
-                        match_res = http_match(request, resp_data_all, interactsh)
-                        resp_data_all = {}
-                        if match_res:
-                            output = {}
-                            output.update(extractor_res['external'])
-                            output.update(payload)
-                            output['extra_info'] = extractor_res['extra_info']
-                            results.append(output)
-                            if request.stop_at_first_match:
-                                return results
-                else:
-                    resp_data.update(dynamic_values)
-                    match_res = http_match(request, resp_data, interactsh)
+                        resp_data_all[f'{k}'] = v
+
+                    resp_data_all.update(dynamic_values)
+                    match_res = http_match(step, resp_data_all, interactsh)
+                    resp_data_all = {}
                     if match_res:
                         output = {}
                         output.update(extractor_res['external'])
                         output.update(payload)
                         output['extra_info'] = extractor_res['extra_info']
                         results.append(output)
-                        if request.stop_at_first_match:
+                        if req.stop_at_first_match:
+                            return results
+                else:
+                    resp_data.update(dynamic_values)
+                    match_res = http_match(step, resp_data, interactsh)
+                    if match_res:
+                        output = {}
+                        output.update(extractor_res['external'])
+                        output.update(payload)
+                        output['extra_info'] = extractor_res['extra_info']
+                        results.append(output)
+                        if req.stop_at_first_match:
                             return results
         except Exception:
             import traceback

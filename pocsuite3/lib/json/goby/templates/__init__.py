@@ -4,7 +4,7 @@ from typing import List
 from pocsuite3.lib.json.goby.model import Info, CaseInsensitiveEnum
 from pocsuite3.lib.json.goby.protocols.http import HttpRequest
 from pocsuite3.lib.json.goby.protocols.network import NetworkRequest
-from pocsuite3.lib.json.goby.operators import ResponseTest
+from pocsuite3.lib.json.goby.operators import ResponseTest, Extractor
 
 
 class ProtocolType(CaseInsensitiveEnum):
@@ -99,4 +99,5 @@ class Template:
     # 其它参数
     stop_at_first_match: bool = True
     variables: dict = field(default_factory=dict)
+    extractors: List[Extractor] = field(default_factory=list)
 

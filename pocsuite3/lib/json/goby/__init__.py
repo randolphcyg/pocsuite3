@@ -82,7 +82,7 @@ class Goby:
         self.goby_template = expand_preprocessors(self.goby_template)
 
         # [tpl]
-        tmp_tpl = json.loads(template)
+        tmp_tpl = json.loads(self.goby_template)
         process_none_lists(Template, tmp_tpl)
         data = hyphen_to_underscore(tmp_tpl)
         self.template = dacite.from_dict(data_class=Template, data=data)
@@ -127,7 +127,7 @@ class Goby:
         for k, v in self.dynamic_values.copy().items():
             self.dynamic_values[k.lower()] = v
 
-        for k, v in asdict(self.template).items():
+        for k, v in self.template.variables.items():
             self.dynamic_values[k] = evaluate(v)
 
         if (f'{Marker.ParenthesisOpen}interactsh-url{Marker.ParenthesisClose}' in self.goby_template or
@@ -137,13 +137,9 @@ class Goby:
             self.dynamic_values['interactsh-url'] = self.interactsh.client.domain
 
         for item in self.template.ScanStepsList:
-            res = execute_http_request(item.Request, self.dynamic_values, self.interactsh)
+            res = execute_http_request(item, self.template, self.dynamic_values, self.interactsh)
             if res:
                 return res
-        # for request in self.template.network:
-        #     res = execute_network_request(request, self.dynamic_values, self.interactsh)
-        #     if res:
-        #         return res
 
         return False
 

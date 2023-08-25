@@ -38,6 +38,13 @@ class ScanStep:
 
 
 @dataclass
+class ExploitStep:
+    Request: HttpRequest
+    # ResponseTest: ResponseTest = field(default=None)
+    SetVariable: List[str] = field(default_factory=list)
+
+
+@dataclass
 class Template:
     """Template json.
     """
@@ -78,7 +85,8 @@ class Template:
     ScanStepsList: List[ScanStep] = field(default_factory=list)
     ScanStepOperation: str = ''
     # JSON 格式定义漏洞利用逻辑，默认为 null，详情参考 ExploitSteps 章节
-    ExploitSteps: List[str] = field(default_factory=list)
+    ExploitStepOperation: str = ''
+    ExploitStepList: List[ExploitStep] = field(default_factory=list)
     # 与 VulType 字段内容保持一致，漏洞类型。
     Tags: List[str] = field(default_factory=list)
     # 漏洞类型，详情见《漏洞类型》章节

@@ -4,7 +4,6 @@ import re
 import socket
 from collections import OrderedDict
 from dataclasses import asdict
-from typing import List
 
 import dacite
 
@@ -15,7 +14,7 @@ from pocsuite3.lib.json.goby.protocols.common.expressions import evaluate, Marke
 from pocsuite3.lib.json.goby.protocols.common.generators import AttackType
 from pocsuite3.lib.json.goby.protocols.http import HTTPMethod, execute_http_request, HttpRequest
 from pocsuite3.lib.json.goby.protocols.network import NetworkInputType, execute_network_request
-from pocsuite3.lib.json.goby.templates import Template, ScanStep
+from pocsuite3.lib.json.goby.templates import Template, ScanStep, ExploitStep
 from pocsuite3.lib.utils import random_str
 
 
@@ -66,10 +65,17 @@ def expand_preprocessors(data: str) -> str:
 
 
 # 处理None值 为None则初始化为空列表
-def process_none_lists(data_class, data_dict):
-    for field_name, field_type in data_class.__annotations__.items():
-        if field_type == List[str] and data_dict.get(field_name) is None:
-            data_dict[field_name] = []
+def parse_json_with_none(data):
+    def dict_ignore_none(ordered_pairs):
+        d = {}
+        for k, v in ordered_pairs:
+            if v is not None:
+                if isinstance(v, dict):
+                    v = dict_ignore_none(v.items())
+                d[k] = v
+        return d
+
+    return json.loads(data, object_pairs_hook=dict_ignore_none)
 
 
 class Goby:
@@ -83,16 +89,28 @@ class Goby:
         self.goby_template = expand_preprocessors(self.goby_template)
 
         # [tpl]
-        tmp_tpl = json.loads(self.goby_template)
-        process_none_lists(Template, tmp_tpl)
+        tmp_tpl = parse_json_with_none(self.goby_template)
         data = hyphen_to_underscore(tmp_tpl)
-        self.template = dacite.from_dict(data_class=Template, data=data)
-        self.template.ScanStepOperation = tmp_tpl['ScanSteps'][0]
-        # self.template.ScanStepsList = tmp_tpl['ScanSteps'][1:]
-        tmp = tmp_tpl['ScanSteps'][1:]
-        for item in tmp:
-            step = dacite.from_dict(data_class=ScanStep, data=item)
-            self.template.ScanStepsList.append(step)
+        filtered_data = {k: v for k, v in data.items() if v != ""}
+        self.template = dacite.from_dict(data_class=Template, data=filtered_data)
+        # 处理 ScanSteps
+        if 'ScanSteps' in tmp_tpl:
+            if len(tmp_tpl['ScanSteps']) > 0:
+                self.template.ScanStepOperation = tmp_tpl['ScanSteps'][0]
+            if len(tmp_tpl['ScanSteps']) > 1:
+                tmp_scan_step = tmp_tpl['ScanSteps'][1:]
+                for item in tmp_scan_step:
+                    step = dacite.from_dict(data_class=ScanStep, data=item)
+                    self.template.ScanStepsList.append(step)
+        # 处理 ExploitSteps
+        if 'ExploitSteps' in tmp_tpl:
+            if len(tmp_tpl['ExploitSteps']) > 0:
+                self.template.ExploitStepOperation = tmp_tpl['ExploitSteps'][0]
+            if len(tmp_tpl['ExploitSteps']) > 1:
+                tmp_exploit_step = tmp_tpl['ExploitSteps'][1:]
+                for item in tmp_exploit_step:
+                    step = dacite.from_dict(data_class=ExploitStep, data=item)
+                    self.template.ExploitStepList.append(step)
 
         # [json tpl]
         self.json_template = AttribDict()
@@ -165,6 +183,7 @@ class Goby:
             info.append(f'    {k} = {v}')
 
         poc_code = [
+            # '#!/usr/bin/python3\n',
             'from pocsuite3.api import POCBase, Goby, register_poc\n',
             '\n',
             '\n',

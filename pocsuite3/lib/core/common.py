@@ -1122,8 +1122,14 @@ class OrderedSet(collections.OrderedDict, collectionsAbc.MutableSet):
 def get_file_text(filepath):
     with open(filepath, 'rb') as f:
         content = f.read()
-        encoding = chardet.detect(content)['encoding'] or 'utf-8'
-        return content.decode(encoding)
+        detect_result = chardet.detect(content)
+        if detect_result['encoding'] == 'gbk' or \
+                detect_result['encoding'] == 'GBK' or \
+                detect_result['encoding'] == 'GB2312':
+            true_content = content.decode('GB2312', "ignore")
+        else:
+            true_content = content.decode('utf-8', "ignore")
+        return true_content
 
 
 if __name__ == '__main__':

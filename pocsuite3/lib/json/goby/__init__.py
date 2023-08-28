@@ -178,7 +178,7 @@ class Goby:
             if k in key_convert:
                 k = key_convert.get(k)
             if type(v) in [str]:
-                v = json.dumps(v.strip())
+                v = json.dumps(v.strip(), ensure_ascii=False)
 
             info.append(f'    {k} = {v}')
 

@@ -8,7 +8,7 @@ import dacite
 import yaml
 from pocsuite3.lib.core.common import urlparse
 from pocsuite3.lib.utils import random_str
-from pocsuite3.lib.yaml.nuclei.model import Severify
+from pocsuite3.lib.yaml.nuclei.model import Severity
 from pocsuite3.lib.yaml.nuclei.operators import ExtractorType, MatcherType
 from pocsuite3.lib.yaml.nuclei.protocols.common.expressions import evaluate, Marker
 from pocsuite3.lib.yaml.nuclei.protocols.common.generators import AttackType
@@ -83,7 +83,7 @@ class Nuclei:
 
         self.template = dacite.from_dict(
             Template, hyphen_to_underscore(self.json_template),
-            config=dacite.Config(cast=[Severify, ExtractorType, MatcherType, HTTPMethod, AttackType, NetworkInputType]))
+            config=dacite.Config(cast=[Severity, ExtractorType, MatcherType, HTTPMethod, AttackType, NetworkInputType]))
 
         self.target = target
         self.interactsh = None
@@ -191,4 +191,5 @@ class Nuclei:
             '\n',
             'register_poc(TestPOC)\n'
         ]
-        return ''.join(poc_code)
+        ret = ''.join(poc_code)
+        return ret

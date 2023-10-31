@@ -13,7 +13,7 @@ class CaseInsensitiveEnum(Enum):
                 return member
 
 
-class Severify(CaseInsensitiveEnum):
+class Severity(CaseInsensitiveEnum):
     Low = '0'
     Medium = '1'
     High = '2'
@@ -40,7 +40,7 @@ class Info:
     tags: StrSlice = field(default_factory=list)
     description: str = ''
     reference: StrSlice = field(default_factory=list)
-    severity: Severify = Severify.Unknown
+    severity: Severity = Severity.Unknown
     metadata: dict = field(default_factory=dict)
     classification: Classification = field(default_factory=Classification)
     remediation: str = ''

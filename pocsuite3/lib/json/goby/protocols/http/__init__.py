@@ -185,6 +185,31 @@ def perform_logical_operation(data, matcher):
         raise ValueError(f"Unsupported operation: {operation}")
 
 
+# TODO SetVariable
+def handle_SetVariable(SetVariable:str, resp_data: dict):
+    parts = SetVariable.split('|')
+    if SetVariable != "":
+        variable_name = parts[0]
+    if len(parts) > 1:
+        source = parts[1]
+        if source == "lastbody":
+            src = resp_data.text
+        elif source == "lastheader":
+            src = resp_data.headers
+        elif source == "statusline":
+            src = ""  # 无匹配项目
+    if len(parts) > 2:
+        match_type = parts[2]
+        if match_type == "regex":
+            pass
+        elif match_type == "sub":
+            pass
+    if len(parts) > 3:
+        pattern = parts[3]
+        # re.sub(src, pattern)  # TODO 缺少替换进去的字符串
+
+
+# TODO 匹配需要测试
 def http_match(step, resp_data: dict, interactsh=None):
     matchers = step.ResponseTest.checks
     matchers_result = []
@@ -196,6 +221,9 @@ def http_match(step, resp_data: dict, interactsh=None):
                 matchers_result.append(matcher_res)
             case "$body":
                 matcher_res = perform_logical_operation(resp_data['body'], matcher)
+                matchers_result.append(matcher_res)
+            case "$head":
+                matcher_res = perform_logical_operation(resp_data['header'], matcher)
                 matchers_result.append(matcher_res)
 
         logger.debug(f'[+] {matcher} -> {matcher_res}')
@@ -291,6 +319,7 @@ def execute_http_request(step, template, dynamic_values, interactsh) -> Union[bo
                         resp_data_all[f'{k}'] = v
 
                     resp_data_all.update(dynamic_values)
+                    # 匹配结果
                     match_res = http_match(step, resp_data_all, interactsh)
                     resp_data_all = {}
                     if match_res:
@@ -303,7 +332,9 @@ def execute_http_request(step, template, dynamic_values, interactsh) -> Union[bo
                             return results
                 else:
                     resp_data.update(dynamic_values)
+                    # 匹配结果
                     match_res = http_match(step, resp_data, interactsh)
+                    # TODO 假设
                     if match_res:
                         output = {}
                         output.update(extractor_res['external'])

@@ -93,7 +93,7 @@ def task_run():
         target, poc_module = kb.task_queue.get()
         if not conf.console_mode:
             poc_module = copy.deepcopy(kb.registered_pocs[poc_module])
-        poc_name = poc_module.name
+        poc_name = poc_module.name if poc_module.name else poc_module.Name
 
         if conf.pcap:
             # start capture flow

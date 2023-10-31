@@ -9,7 +9,7 @@ import dacite
 
 from pocsuite3.lib.core.common import urlparse
 from pocsuite3.lib.core.datatype import AttribDict
-from pocsuite3.lib.json.goby.model import Severify
+from pocsuite3.lib.json.goby.model import Severity
 from pocsuite3.lib.json.goby.protocols.common.expressions import evaluate, Marker
 from pocsuite3.lib.json.goby.protocols.common.generators import AttackType
 from pocsuite3.lib.json.goby.protocols.http import HTTPMethod, execute_http_request, HttpRequest
@@ -128,6 +128,8 @@ class Goby:
         # Dynamic variables can be placed in the path to modify its behavior on runtime.
         # Variables start with {{ and end with }} and are case-sensitive.
 
+        result = False
+
         u = urlparse(self.target)
         self.dynamic_values['BaseURL'] = self.target
         self.dynamic_values['RootURL'] = f'{u.scheme}://{u.netloc}'
@@ -155,19 +157,23 @@ class Goby:
             self.interactsh = InteractshClient()
             self.dynamic_values['interactsh-url'] = self.interactsh.client.domain
 
+        res = []
         for item in self.template.ScanStepsList:
-            res = execute_http_request(item, self.template, self.dynamic_values, self.interactsh)
-            if res:
-                return res
-
-        return False
+            res_item = execute_http_request(item, self.template, self.dynamic_values, self.interactsh)
+            res.append(res_item)
+        # 对几个测试做汇总
+        if self.template.ScanStepOperation == "OR":
+            result = any(res)
+        elif self.template.ScanStepOperation == "AND":
+            result = all(res)
+        return result
 
     def run(self):
         return self.execute_template()
 
     def __str__(self):
         """
-        Convert nuclei template to Pocsuite3
+        Convert goby .json template to Pocsuite3 .py
         """
         info = []
         key_convert = {
@@ -183,7 +189,6 @@ class Goby:
             info.append(f'    {k} = {v}')
 
         poc_code = [
-            # '#!/usr/bin/python3\n',
             'from pocsuite3.api import POCBase, Goby, register_poc\n',
             '\n',
             '\n',
